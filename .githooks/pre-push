@@ -1,0 +1,20 @@
+#!/bin/sh
+# M.O.B.I.™ · Git Convention v1.9.3 §5: Protección Soberana de Rama Principal
+# Bloquea push directo a refs/heads/main a menos que se defina MOBI_HOTFIX=1
+
+remote="$1"
+url="$2"
+
+while read local_ref local_sha remote_ref remote_sha; do
+  if [ "$remote_ref" = "refs/heads/main" ] && [ -z "$MOBI_HOTFIX" ]; then
+    echo "======================================================================" >&2
+    echo "✖ PUSH DIRECTO A 'main' BLOQUEADO (Git Convention v1.9.3 §5)" >&2
+    echo "  Todo cambio debe integrarse mediante rama y PR auditado." >&2
+    echo "  Si esto es un hotfix de emergencia en producción, ejecuta:" >&2
+    echo "    MOBI_HOTFIX=1 git push $remote main" >&2
+    echo "======================================================================" >&2
+    exit 1
+  fi
+done
+
+exit 0

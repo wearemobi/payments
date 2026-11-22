@@ -1,0 +1,20 @@
+{
+  "name": "payments-monorepo",
+  "private": true,
+  "description": "M.O.B.I.™ Payments & Cashier Satellite Apps Monorepo (pay.mobiware.app) — SPEC-WPAY1",
+  "author": "M.O.B.I.™",
+  "type": "module",
+  "scripts": {
+    "dev:pay": "pnpm --filter @payments/pay dev",
+    "build": "pnpm -r run build",
+    "lint": "pnpm -r run lint",
+    "test": "pnpm -r test",
+    "typecheck": "pnpm -r run typecheck",
+    "deploy:pay": "pnpm --filter @payments/pay run deploy",
+    "api:gen": "openapi-typescript ../wared/api/openapi.yaml -o packages/common/src/api/schema.d.ts"
+  },
+  "devDependencies": {
+    "openapi-typescript": "^7.6.1",
+    "typescript": "^5.7.3"
+  }
+}

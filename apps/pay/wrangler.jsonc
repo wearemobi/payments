@@ -1,0 +1,14 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "ware-pay",
+  "compatibility_date": "2024-09-23",
+  "compatibility_flags": ["nodejs_compat"],
+  "pages_build_output_dir": "./dist",
+  "routes": [
+    {
+      "pattern": "pay.mobiware.app/*",
+      "zone_name": "mobiware.app",
+      "custom_domain": true
+    }
+  ]
+}
