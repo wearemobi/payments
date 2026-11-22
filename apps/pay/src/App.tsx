@@ -1,15 +1,15 @@
 import { useSatelliteTheme } from "@payments/common";
 import { useAuthStore } from "./store/auth";
 import LoginScreen from "./components/auth/LoginScreen";
-import PosScreen from "./components/pos/PosScreen";
+import PayScreen from "./components/pay/PayScreen";
 
 export default function App() {
   const token = useAuthStore((state) => state.token);
-  const { theme, toggleTheme } = useSatelliteTheme("ware-pos.theme");
+  const { theme, toggleTheme } = useSatelliteTheme("ware-pay.theme");
 
   if (!token) {
     return <LoginScreen />;
   }
 
-  return <PosScreen theme={theme} onToggleTheme={toggleTheme} />;
+  return <PayScreen theme={theme} onToggleTheme={toggleTheme} />;
 }

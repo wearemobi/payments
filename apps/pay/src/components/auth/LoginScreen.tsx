@@ -2,17 +2,17 @@ import { LoginScreen } from "@payments/common";
 import { fetchCashiers, loginWithPin, resolveTenantId } from "../../lib/api";
 import { useAuthStore } from "../../store/auth";
 
-export const POS_ROLES = ["CASHIER", "ADMIN"] as const;
+export const PAY_ROLES = ["CASHIER", "ADMIN"] as const;
 
-export default function PosLoginScreen() {
+export default function PayLoginScreen() {
   const login = useAuthStore((state) => state.login);
   return (
     <LoginScreen
-      title="MobiWare Retail POS"
-      subtitle="Terminal de punto de venta"
+      title="MobiWare Payments"
+      subtitle="Terminal de caja y pagos"
       operatorsAriaLabel="Cajeros autorizados"
       accentColor="retail"
-      allowedRoles={[...POS_ROLES]}
+      allowedRoles={[...PAY_ROLES]}
       tenantId={resolveTenantId()}
       fetchCashiers={fetchCashiers}
       loginWithPin={loginWithPin}
