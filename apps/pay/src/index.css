@@ -2,6 +2,16 @@
 @import "../../../packages/common/src/ui/tokens.css";
 @source "../../../packages/common/src";
 
+:root,
+:root.dark,
+.dark {
+  /* SPEC-WPAY1: payments accent */
+}
+
+body {
+  margin: 0;
+}
+
 @keyframes pin-shake {
   0%, 100% { transform: translateX(0); }
   20% { transform: translateX(-8px); }

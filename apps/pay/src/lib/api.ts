@@ -10,9 +10,7 @@ import {
 } from "@payments/common";
 import { useAuthStore } from "../store/auth";
 
-export const TENANT_STORAGE_KEY = "ware-pos.tenant";
-export const WAREHOUSE_ID = "WH-MAIN";
-export const EMISSION_POINT = "POS-01";
+export const TENANT_STORAGE_KEY = "ware-pay.tenant";
 
 export function resolveTenantId(): string {
   return commonResolveTenantId(TENANT_STORAGE_KEY);
@@ -31,23 +29,9 @@ export const api = createApiClient({
 
 export type { Cashier, PinLoginResponse };
 
-export type InventoryResponse =
-  paths["/v1/inventory/products"]["get"]["responses"]["200"]["content"]["application/json"];
-
-export type Product = NonNullable<InventoryResponse["items"]>[number];
-
 export type Customer = NonNullable<
   paths["/v1/customers"]["get"]["responses"]["200"]["content"]["application/json"]["items"]
 >[number];
-
-export type CustomersResponse =
-  paths["/v1/customers"]["get"]["responses"]["200"]["content"]["application/json"];
-
-export type CheckoutRequest =
-  paths["/v1/pos/checkout"]["post"]["requestBody"]["content"]["application/json"];
-
-export type CheckoutResponse =
-  paths["/v1/pos/checkout"]["post"]["responses"]["200"]["content"]["application/json"];
 
 type OrdersListPayload =
   paths["/v1/orders"]["get"]["responses"]["200"]["content"]["application/json"];
@@ -58,7 +42,6 @@ type OrderDetailPayload =
   paths["/v1/orders/{id}"]["get"]["responses"]["200"]["content"]["application/json"];
 
 export type OrderDetailResponse = OrderDetailPayload;
-
 export type OrderItem = NonNullable<OrderDetailPayload["items"]>[number];
 
 export type OrderCheckoutRequest =
@@ -77,7 +60,26 @@ export interface Business {
   updated_at?: string;
 }
 
-export const RETAIL_APP_ID = "ware-retail";
+export type UnpaidOrderOrigin = "ALL" | "KITCHEN" | "RETAIL";
+
+export interface UnpaidOrdersFilter {
+  search?: string;
+  businessId?: string | null;
+  origin?: UnpaidOrderOrigin;
+}
+
+const KITCHEN_TYPES = new Set(["DINE_IN", "TAKEAWAY", "DELIVERY"]);
+const RETAIL_TYPES = new Set(["ECOMMERCE", "WHATSAPP", "INSTAGRAM", "POS", "CALL_CENTER"]);
+
+export function matchesOrigin(order: Order, origin: UnpaidOrderOrigin): boolean {
+  if (origin === "ALL") return true;
+  const type = String(order.order_type ?? "").toUpperCase();
+  const appId = String((order as unknown as { app_id?: string }).app_id ?? "").toLowerCase();
+  if (origin === "KITCHEN") {
+    return appId === "ware-kitchen" || KITCHEN_TYPES.has(type);
+  }
+  return appId === "ware-retail" || RETAIL_TYPES.has(type);
+}
 
 export async function fetchCashiers(): Promise<Cashier[]> {
   return commonFetchCashiers(api, resolveTenantId());
@@ -85,38 +87,6 @@ export async function fetchCashiers(): Promise<Cashier[]> {
 
 export async function loginWithPin(username: string, pin: string): Promise<PinLoginResponse> {
   return commonLoginWithPin(api, resolveTenantId(), username, pin);
-}
-
-export async function fetchProducts(search = ""): Promise<Product[]> {
-  const term = search.trim();
-  const { data, error } = await api.GET("/v1/inventory/products", {
-    params: {
-      header: { "X-Tenant-Id": resolveTenantId() },
-      query: {
-        warehouse_id: WAREHOUSE_ID,
-        vertical: "RETAIL",
-        size: 200,
-        sort: "name,asc",
-        ...(term ? { search: term } : {}),
-      },
-    },
-  });
-  if (error || !data) {
-    throw new Error(parseApiError(error, "No fue posible cargar el catálogo de productos."));
-  }
-  return (data.items ?? []).filter((product) => product.is_active !== false);
-}
-
-export async function fetchProductBySku(sku: string): Promise<Product | null> {
-  const { data, error } = await api.GET("/v1/inventory/products/{sku}", {
-    params: {
-      header: { "X-Tenant-Id": resolveTenantId() },
-      path: { sku },
-      query: { warehouse_id: WAREHOUSE_ID },
-    },
-  });
-  if (error || !data) return null;
-  return data;
 }
 
 export async function fetchCustomers(search: string): Promise<Customer[]> {
@@ -131,61 +101,31 @@ export async function fetchCustomers(search: string): Promise<Customer[]> {
   if (error || !data) {
     throw new Error(parseApiError(error, "No fue posible buscar clientes."));
   }
-  return data.items ?? data.customers ?? [];
+  return data.items ?? (data as any).customers ?? [];
 }
 
-function newIdempotencyKey(): string {
-  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
-    return crypto.randomUUID();
-  }
-  return `pos-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-}
-
-export async function submitCheckout(payload: CheckoutRequest): Promise<CheckoutResponse> {
-  const { data, error } = await api.POST("/v1/pos/checkout", {
-    params: {
-      header: {
-        "X-Tenant-Id": resolveTenantId(),
-        "Idempotency-Key": newIdempotencyKey(),
-      },
-    },
-    body: payload,
-  });
-  if (error || !data) {
-    throw new Error(parseApiError(error, "No fue posible procesar la venta."));
-  }
-  return data;
-}
-
-/**
- * Pending Tienda orders from the Order Master (SPEC-WRTL2): only the
- * ware-retail app orders that still await payment are listed.
- */
-export async function fetchPendingRetailOrders(
-  search?: string,
-  businessId?: string | null,
-): Promise<Order[]> {
-  const term = (search ?? "").trim();
-  const business = (businessId ?? "").trim();
+export async function fetchUnpaidOrders(filter: UnpaidOrdersFilter = {}): Promise<Order[]> {
+  const term = (filter.search ?? "").trim();
+  const business = (filter.businessId ?? "").trim();
   const { data, error } = await api.GET("/v1/orders", {
     params: {
       header: { "X-Tenant-Id": resolveTenantId() },
       query: {
-        app_id: RETAIL_APP_ID,
         payment_status: "UNPAID",
+        exclude_cancelled: true,
         page: 1,
-        size: 50,
+        size: 100,
         ...(business ? { business } : {}),
         ...(term ? { search: term } : {}),
-      },
+      } as any,
     },
   });
   if (error || !data) {
-    throw new Error(
-      parseApiError(error, "No se pudieron cargar las órdenes pendientes."),
-    );
+    throw new Error(parseApiError(error, "No se pudieron cargar las órdenes pendientes de cobro."));
   }
-  return data.items ?? [];
+  const items = data.items ?? [];
+  const origin = filter.origin ?? "ALL";
+  return items.filter((order) => matchesOrigin(order, origin));
 }
 
 export async function fetchOrderDetail(orderId: string): Promise<OrderDetailResponse> {
@@ -196,11 +136,16 @@ export async function fetchOrderDetail(orderId: string): Promise<OrderDetailResp
     },
   });
   if (error || !data) {
-    throw new Error(
-      parseApiError(error, "No se pudo cargar el detalle de la orden."),
-    );
+    throw new Error(parseApiError(error, "No se pudo cargar el detalle de la orden."));
   }
   return data;
+}
+
+export function newIdempotencyKey(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return `pay-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
 export async function submitOrderCheckout(
@@ -224,10 +169,6 @@ export async function submitOrderCheckout(
   return data;
 }
 
-export function newOrderIdempotencyKey(): string {
-  return newIdempotencyKey();
-}
-
 /** GET /v1/orders/businesses (the OpenAPI document only types POST today). */
 export async function fetchBusinesses(): Promise<Business[]> {
   const { data, error } = await (api as any).GET("/v1/orders/businesses", {
@@ -237,6 +178,22 @@ export async function fetchBusinesses(): Promise<Business[]> {
     throw new Error(parseApiError(error, "No se pudieron cargar los negocios."));
   }
   if (Array.isArray(data)) return data as Business[];
-  if (Array.isArray(data?.items)) return data.items as Business[];
+  if (Array.isArray((data as any)?.items)) return (data as any).items as Business[];
   return [];
+}
+
+export type Product = NonNullable<
+  paths["/v1/inventory/products"]["get"]["responses"]["200"]["content"]["application/json"]["items"]
+>[number];
+export type CheckoutRequest = any;
+export type CheckoutResponse = any;
+export const EMISSION_POINT = "M001";
+export const WAREHOUSE_ID = "WH-MAIN";
+export const RETAIL_APP_ID = "ware-retail";
+export function newOrderIdempotencyKey() { return newIdempotencyKey(); }
+export async function fetchProducts() { return [] as Product[]; }
+export async function fetchProductBySku() { return null; }
+export async function submitCheckout() { throw new Error("Not supported in payments satellite"); }
+export async function fetchPendingRetailOrders(search?: string, businessId?: string | null) {
+  return fetchUnpaidOrders({ search, businessId, origin: "RETAIL" });
 }

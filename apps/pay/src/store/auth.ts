@@ -2,9 +2,9 @@ import { createAuthStore, type OperatorSession } from "@payments/common";
 
 export type { OperatorSession };
 
-export const BUSINESS_STORAGE_PREFIX = "ware-pos.businessId.";
+export const BUSINESS_STORAGE_PREFIX = "ware-pay.businessId.";
 
-export interface PosAuthState {
+export interface PayAuthState {
   token: string;
   tenantId: string;
   operatorId: string;
@@ -13,12 +13,12 @@ export interface PosAuthState {
   expiresAtUnix: number;
   login: (session: OperatorSession) => void;
   logout: () => void;
-  /** Active orders.business of this terminal (SPEC-WRTL3). */
+  /** Active orders.business of this terminal (SPEC-WPAY1/WRTL3). */
   businessId: string;
   setBusinessId: (businessId: string) => void;
 }
 
-const baseStore = createAuthStore("ware-pos.auth");
+const baseStore = createAuthStore("ware-pay.auth");
 
 function readUrlBusinessId(): string {
   if (typeof window === "undefined") return "";
@@ -29,8 +29,6 @@ function readUrlBusinessId(): string {
   }
 }
 
-// The QR from ware1 carries ?b=<business_id>; capture it before the UI mounts
-// so the first orders/businesses resolution already targets that business.
 baseStore.setState({
   businessId: readUrlBusinessId(),
   setBusinessId: (businessId: string) => {
@@ -44,7 +42,7 @@ baseStore.setState({
         window.localStorage.removeItem(`${BUSINESS_STORAGE_PREFIX}${tenantId}`);
       }
     } catch {
-      // restricted storage: keep the in-memory selection only
+      // restricted storage: keep in-memory selection only
     }
   },
 } as never);
@@ -59,8 +57,8 @@ export function storedBusinessId(tenantId: string): string {
 }
 
 export const useAuthStore = baseStore as unknown as {
-  <T>(selector: (state: PosAuthState) => T): T;
-  getState: () => PosAuthState;
-  setState: (partial: Partial<PosAuthState>) => void;
+  <T>(selector: (state: PayAuthState) => T): T;
+  getState: () => PayAuthState;
+  setState: (partial: Partial<PayAuthState>) => void;
   subscribe: typeof baseStore.subscribe;
 };
