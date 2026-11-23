@@ -9,6 +9,7 @@ import {
   type paths,
 } from "@payments/common";
 import { useAuthStore } from "../store/auth";
+import { getEmissionPoint as getStoredEmissionPoint } from "./emissionPoint";
 
 export const TENANT_STORAGE_KEY = "ware-pay.tenant";
 
@@ -187,7 +188,13 @@ export type Product = NonNullable<
 >[number];
 export type CheckoutRequest = any;
 export type CheckoutResponse = any;
+
+/** @deprecated Use getCurrentEmissionPoint(). */
 export const EMISSION_POINT = "M001";
+
+export function getCurrentEmissionPoint(businessId?: string): string {
+  return getStoredEmissionPoint(businessId ?? "");
+}
 export const WAREHOUSE_ID = "WH-MAIN";
 export const RETAIL_APP_ID = "ware-retail";
 export function newOrderIdempotencyKey() { return newIdempotencyKey(); }

@@ -11,6 +11,8 @@ import {
   type OrderItem,
   type UnpaidOrderOrigin,
 } from "../../lib/api";
+import { getEmissionPoint } from "../../lib/emissionPoint";
+import DeviceSettingsDialog from "./DeviceSettingsDialog";
 import { formatScaledMoney } from "../../lib/quantity";
 import { useDebouncedValue } from "../../lib/useDebouncedValue";
 import { storedBusinessId, useAuthStore } from "../../store/auth";
@@ -47,8 +49,11 @@ export default function PayScreen({ theme, onToggleTheme }: Props) {
   const [detailItems, setDetailItems] = useState<OrderItem[]>([]);
   const [itemsLoading, setItemsLoading] = useState(false);
   const [refreshToken, setRefreshToken] = useState(0);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [emissionVersion, setEmissionVersion] = useState(0);
 
   const debouncedSearch = useDebouncedValue(search, 250);
+  const emissionPoint = useMemo(() => getEmissionPoint(activeBusinessId), [activeBusinessId, emissionVersion]);
 
   useEffect(() => { try { window.localStorage.setItem(SCALE_KEY, fontScale); } catch {} }, [fontScale]);
 
@@ -130,6 +135,15 @@ export default function PayScreen({ theme, onToggleTheme }: Props) {
             ) : businesses.length === 1 ? (
               <span className="text-xs text-muted-foreground">{businesses[0]?.name}</span>
             ) : null}
+            <button
+              type="button"
+              onClick={() => setSettingsOpen(true)}
+              className="h-7 rounded-lg border border-border bg-background px-2 text-xs font-mono font-medium hover:bg-muted"
+              aria-label="Configurar caja"
+              title="Configurar punto de emisión"
+            >
+              {emissionPoint}
+            </button>
             <div role="group" aria-label="Escala" className="flex items-center gap-1 rounded-lg border border-border bg-muted/60 p-0.5 text-xs">
               {(["sm", "base", "lg"] as const).map((s) => (
                 <button key={s} type="button" onClick={() => setFontScale(s)} aria-pressed={fontScale === s}
@@ -170,6 +184,13 @@ export default function PayScreen({ theme, onToggleTheme }: Props) {
           />
         </div>
       </main>
+
+      <DeviceSettingsDialog
+        open={settingsOpen}
+        businessId={activeBusinessId}
+        onClose={() => setSettingsOpen(false)}
+        onSaved={() => setEmissionVersion((v) => v + 1)}
+      />
     </div>
   );
 }

@@ -3,6 +3,7 @@ import { AlertCircle, CreditCard, Loader2, Plus, Trash2 } from "lucide-react";
 import { Badge, Button, Card, Input } from "@payments/common";
 import {
   fetchCustomers,
+  getCurrentEmissionPoint,
   newIdempotencyKey,
   submitOrderCheckout,
   type Customer,
@@ -11,6 +12,7 @@ import {
   type OrderItem,
 } from "../../lib/api";
 import { formatScaledMoney, fromScaled, parseMoneyInput } from "../../lib/quantity";
+import { useAuthStore } from "../../store/auth";
 import ReceiptDialog, { type ReceiptData } from "./ReceiptDialog";
 
 type DocumentType = "01" | "03";
@@ -52,6 +54,7 @@ export function computeTotals(orderTotal: number, tipScaled: number, payments: {
 }
 
 export default function OrderSettlementPanel({ order, items, itemsLoading, onSettled }: Props) {
+  const activeBusinessId = useAuthStore((s) => s.businessId);
   const [documentType, setDocumentType] = useState<DocumentType>("01");
   const [customerSearch, setCustomerSearch] = useState("");
   const [customerResults, setCustomerResults] = useState<Customer[]>([]);
@@ -122,7 +125,7 @@ export default function OrderSettlementPanel({ order, items, itemsLoading, onSet
     try {
       const payload: OrderCheckoutRequest = {
         document_type: documentType,
-        emission_point: "M001",
+        emission_point: getCurrentEmissionPoint(activeBusinessId),
         payments: parsedPayments.map((p) => {
           const row: any = { payment_method: p.method, amount: fromScaled(p.amount) };
           if (p.reference.trim()) row.reference = p.reference.trim();
