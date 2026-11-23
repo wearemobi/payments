@@ -5,6 +5,7 @@ import {
   fetchCustomers,
   getCurrentEmissionPoint,
   newIdempotencyKey,
+  resolveTenantId,
   submitOrderCheckout,
   type Customer,
   type Order,
@@ -157,7 +158,18 @@ export default function OrderSettlementPanel({ order, items, itemsLoading, onSet
         paymentMethod: parsedPayments.map((p) => METHODS.find((m) => m.value === p.method)?.label ?? p.method).join(" + "),
         documentType,
         customerName: customer?.legal_name,
+        customerTaxId: customer?.tax_id,
         issuedAt: new Date().toISOString(),
+        subtotal: orderTotal,
+        items: items.map((it) => ({
+          description: it.name ?? it.sku ?? "Ítem",
+          quantity: it.quantity ?? 0,
+          unitPrice: it.unit_price ?? 0,
+          lineTotal: it.line_total ?? Math.round(((it.quantity ?? 0) * (it.unit_price ?? 0)) / 10000),
+        })),
+        tenantId: resolveTenantId(),
+        emissionPoint: getCurrentEmissionPoint(activeBusinessId),
+        operatorName: useAuthStore.getState().operatorName,
       });
       onSettled();
     } catch (err) {

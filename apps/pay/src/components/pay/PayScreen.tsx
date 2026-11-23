@@ -3,16 +3,19 @@ import { CreditCard } from "lucide-react";
 import { SatelliteHeader, type SatelliteTheme } from "@payments/common";
 import {
   fetchBusinesses,
+  fetchCurrentShift,
   fetchOrderDetail,
   fetchUnpaidOrders,
+  getCurrentEmissionPoint,
   resolveTenantId,
   type Business,
+  type CashShift,
   type Order,
   type OrderItem,
   type UnpaidOrderOrigin,
 } from "../../lib/api";
-import { getEmissionPoint } from "../../lib/emissionPoint";
 import DeviceSettingsDialog from "./DeviceSettingsDialog";
+import ShiftDrawerDialog from "./ShiftDrawerDialog";
 import { formatScaledMoney } from "../../lib/quantity";
 import { useDebouncedValue } from "../../lib/useDebouncedValue";
 import { storedBusinessId, useAuthStore } from "../../store/auth";
@@ -50,10 +53,12 @@ export default function PayScreen({ theme, onToggleTheme }: Props) {
   const [itemsLoading, setItemsLoading] = useState(false);
   const [refreshToken, setRefreshToken] = useState(0);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [shiftOpen, setShiftOpen] = useState(false);
+  const [currentShift, setCurrentShift] = useState<CashShift | null>(null);
   const [emissionVersion, setEmissionVersion] = useState(0);
 
   const debouncedSearch = useDebouncedValue(search, 250);
-  const emissionPoint = useMemo(() => getEmissionPoint(activeBusinessId), [activeBusinessId, emissionVersion]);
+  const emissionPoint = useMemo(() => getCurrentEmissionPoint(activeBusinessId), [activeBusinessId, emissionVersion]);
 
   useEffect(() => { try { window.localStorage.setItem(SCALE_KEY, fontScale); } catch {} }, [fontScale]);
 
@@ -71,6 +76,16 @@ export default function PayScreen({ theme, onToggleTheme }: Props) {
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    const operatorId = useAuthStore.getState().operatorId;
+    if (!operatorId) return;
+    fetchCurrentShift(operatorId, emissionPoint)
+      .then((s) => { if (!cancelled) setCurrentShift(s?.status === "OPEN" ? s : null); })
+      .catch(() => { if (!cancelled) setCurrentShift(null); });
+    return () => { cancelled = true; };
+  }, [emissionPoint, emissionVersion]);
 
   const loadOrders = useCallback(() => {
     let cancelled = false;
@@ -144,6 +159,14 @@ export default function PayScreen({ theme, onToggleTheme }: Props) {
             >
               {emissionPoint}
             </button>
+            <button
+              type="button"
+              onClick={() => setShiftOpen(true)}
+              className={currentShift ? "h-7 rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-2 text-xs font-medium text-emerald-700 dark:text-emerald-400" : "h-7 rounded-lg border border-border bg-background px-2 text-xs font-medium hover:bg-muted"}
+              aria-label={currentShift ? "Turno abierto" : "Abrir caja"}
+            >
+              {currentShift ? "Turno Abierto" : "Abrir Caja"}
+            </button>
             <div role="group" aria-label="Escala" className="flex items-center gap-1 rounded-lg border border-border bg-muted/60 p-0.5 text-xs">
               {(["sm", "base", "lg"] as const).map((s) => (
                 <button key={s} type="button" onClick={() => setFontScale(s)} aria-pressed={fontScale === s}
@@ -190,6 +213,13 @@ export default function PayScreen({ theme, onToggleTheme }: Props) {
         businessId={activeBusinessId}
         onClose={() => setSettingsOpen(false)}
         onSaved={() => setEmissionVersion((v) => v + 1)}
+        shiftOpen={!!currentShift}
+      />
+
+      <ShiftDrawerDialog
+        open={shiftOpen}
+        onClose={() => setShiftOpen(false)}
+        onShiftChange={(s) => setCurrentShift(s?.status === "OPEN" ? s : null)}
       />
     </div>
   );
