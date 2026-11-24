@@ -245,9 +245,21 @@ async function shiftFetch<T>(path: string, init: RequestInit = {}, fallback: str
     useAuthStore.getState().logout();
   }
   const text = await response.text();
-  const data = text ? (JSON.parse(text) as unknown) : null;
+  let data: unknown = null;
+  if (text) {
+    try {
+      data = JSON.parse(text);
+    } catch {
+      data = null;
+    }
+  }
   if (!response.ok) {
-    throw new Error(parseApiError(data, fallback));
+    const err = new Error(parseApiError(data, fallback)) as Error & { status?: number };
+    err.status = response.status;
+    throw err;
+  }
+  if (text && data === null) {
+    throw new Error(fallback);
   }
   return data as T;
 }
@@ -257,16 +269,12 @@ export async function fetchCurrentShift(
   emissionPoint = getCurrentEmissionPoint(useAuthStore.getState().businessId),
 ): Promise<CashShift | null> {
   const qs = new URLSearchParams({ operator_id: operatorId, emission_point: emissionPoint });
-  const token = useAuthStore.getState().token;
-  const headers = new Headers({ "X-Tenant-Id": resolveTenantId() });
-  if (token) headers.set("Authorization", `Bearer ${token}`);
-  const response = await fetch(`${API_BASE_URL}/v1/shifts/current?${qs.toString()}`, { headers });
-  if (response.status === 404) return null;
-  if (response.status === 401) useAuthStore.getState().logout();
-  const text = await response.text();
-  const data = text ? (JSON.parse(text) as unknown) : null;
-  if (!response.ok) throw new Error(parseApiError(data, "No se pudo consultar el turno actual."));
-  return data as CashShift;
+  try {
+    return await shiftFetch<CashShift>(`/v1/shifts/current?${qs.toString()}`, {}, "No se pudo consultar el turno actual.");
+  } catch (e) {
+    if ((e as { status?: number } | null)?.status === 404) return null;
+    throw e;
+  }
 }
 
 export async function openShift(input: {
@@ -312,24 +320,6 @@ export async function closeShift(
   );
 }
 
-export type Product = NonNullable<
-  paths["/v1/inventory/products"]["get"]["responses"]["200"]["content"]["application/json"]["items"]
->[number];
-export type CheckoutRequest = any;
-export type CheckoutResponse = any;
-
-/** @deprecated Use getCurrentEmissionPoint(). */
-export const EMISSION_POINT = "M001";
-
 export function getCurrentEmissionPoint(businessId?: string): string {
   return getStoredEmissionPoint(businessId ?? "");
-}
-export const WAREHOUSE_ID = "WH-MAIN";
-export const RETAIL_APP_ID = "ware-retail";
-export function newOrderIdempotencyKey() { return newIdempotencyKey(); }
-export async function fetchProducts() { return [] as Product[]; }
-export async function fetchProductBySku() { return null; }
-export async function submitCheckout() { throw new Error("Not supported in payments satellite"); }
-export async function fetchPendingRetailOrders(search?: string, businessId?: string | null) {
-  return fetchUnpaidOrders({ search, businessId, origin: "RETAIL" });
 }
