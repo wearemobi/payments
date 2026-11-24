@@ -205,6 +205,10 @@ export interface CashShift {
   status: "OPEN" | "CLOSED";
   opening_cash: number;
   cash_sales?: number;
+  card_sales?: number;
+  transfer_sales?: number;
+  other_sales?: number;
+  total_sales?: number;
   cash_in?: number;
   cash_out?: number;
   expected_cash?: number;
