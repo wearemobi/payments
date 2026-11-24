@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AlertCircle, Loader2, Wallet, X } from "lucide-react";
 import { Badge, Button, Input } from "@payments/common";
 import {
@@ -35,6 +35,8 @@ function differenceBadge(diff: number | null | undefined) {
 }
 
 export default function ShiftDrawerDialog({ open, onClose, onShiftChange }: Props) {
+  const onShiftChangeRef = useRef(onShiftChange);
+  onShiftChangeRef.current = onShiftChange;
   const operatorId = useAuthStore((s) => s.operatorId);
   const operatorName = useAuthStore((s) => s.operatorName);
   const businessId = useAuthStore((s) => s.businessId);
@@ -60,7 +62,7 @@ export default function ShiftDrawerDialog({ open, onClose, onShiftChange }: Prop
       .then(async (current) => {
         if (cancelled) return;
         setShift(current);
-        onShiftChange?.(current);
+        onShiftChangeRef.current?.(current);
         if (current?.id) {
           const rep = await fetchShiftReport(current.id);
           if (!cancelled) setReport(rep);
@@ -71,7 +73,7 @@ export default function ShiftDrawerDialog({ open, onClose, onShiftChange }: Prop
       .catch((e: Error) => { if (!cancelled) setError(e.message); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [open, operatorId, emissionPoint, onShiftChange]);
+  }, [open, operatorId, emissionPoint]);
 
   if (!open) return null;
 
@@ -140,6 +142,7 @@ export default function ShiftDrawerDialog({ open, onClose, onShiftChange }: Prop
   const active = shift?.status === "OPEN" ? shift : null;
   const closed = shift?.status === "CLOSED" ? shift : null;
   const totals = report?.totals;
+  const reportShift = report?.shift ?? active;
 
   return (
     <div
@@ -209,9 +212,9 @@ export default function ShiftDrawerDialog({ open, onClose, onShiftChange }: Prop
                   <h3 className="text-sm font-semibold">Corte X / Cierre Z</h3>
                   <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
                     <span className="text-muted-foreground">Ventas efectivo</span><span className="text-right font-mono">{formatScaledMoney(totals?.cash_sales ?? active.cash_sales ?? 0)}</span>
-                    <span className="text-muted-foreground">Ventas tarjeta</span><span className="text-right font-mono">{formatScaledMoney(totals?.card_sales ?? 0)}</span>
-                    <span className="text-muted-foreground">Ventas transferencia</span><span className="text-right font-mono">{formatScaledMoney(totals?.transfer_sales ?? 0)}</span>
-                    <span className="text-muted-foreground">Total ventas</span><span className="text-right font-mono">{formatScaledMoney(totals?.total_sales ?? 0)}</span>
+                    <span className="text-muted-foreground">Ventas tarjeta</span><span className="text-right font-mono">{formatScaledMoney(reportShift?.card_sales ?? totals?.card_sales ?? 0)}</span>
+                    <span className="text-muted-foreground">Ventas transferencia</span><span className="text-right font-mono">{formatScaledMoney(reportShift?.transfer_sales ?? totals?.transfer_sales ?? 0)}</span>
+                    <span className="text-muted-foreground">Total ventas</span><span className="text-right font-mono">{formatScaledMoney(reportShift?.total_sales ?? totals?.total_sales ?? 0)}</span>
                   </div>
                   <label className="flex flex-col gap-1 text-xs font-medium">Efectivo contado (USD)<Input inputMode="decimal" value={countedCash} onChange={(e) => setCountedCash(e.target.value)} /></label>
                   {parseMoneyInput(countedCash) != null && (

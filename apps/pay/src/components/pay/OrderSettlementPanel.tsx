@@ -160,7 +160,8 @@ export default function OrderSettlementPanel({ order, items, itemsLoading, onSet
         customerName: customer?.legal_name,
         customerTaxId: customer?.tax_id,
         issuedAt: new Date().toISOString(),
-        subtotal: orderTotal,
+        subtotal: order?.subtotal ?? orderTotal,
+        taxAmount: order?.tax_total,
         items: items.map((it) => ({
           description: it.name ?? it.sku ?? "Ítem",
           quantity: it.quantity ?? 0,

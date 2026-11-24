@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { CreditCard } from "lucide-react";
+import { AlertCircle, CreditCard } from "lucide-react";
 import { SatelliteHeader, type SatelliteTheme } from "@payments/common";
 import {
   fetchBusinesses,
@@ -50,6 +50,8 @@ export default function PayScreen({ theme, onToggleTheme }: Props) {
   const [origin, setOrigin] = useState<UnpaidOrderOrigin>("ALL");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [detailItems, setDetailItems] = useState<OrderItem[]>([]);
+  const [detailError, setDetailError] = useState("");
+  const [detailRetry, setDetailRetry] = useState(0);
   const [itemsLoading, setItemsLoading] = useState(false);
   const [refreshToken, setRefreshToken] = useState(0);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -104,15 +106,20 @@ export default function PayScreen({ theme, onToggleTheme }: Props) {
   }, [loadOrders, refreshToken]);
 
   useEffect(() => {
-    if (!selectedId) { setDetailItems([]); return; }
+    if (!selectedId) { setDetailItems([]); setDetailError(""); return; }
     let cancelled = false;
     setItemsLoading(true);
+    setDetailError("");
     fetchOrderDetail(selectedId)
       .then((d) => { if (!cancelled) setDetailItems(d.items ?? []); })
-      .catch(() => { if (!cancelled) setDetailItems([]); })
+      .catch((err: Error) => { if (!cancelled) { setDetailItems([]); setDetailError(err?.message || "No se pudo cargar el detalle de la orden"); } })
       .finally(() => { if (!cancelled) setItemsLoading(false); });
     return () => { cancelled = true; };
-  }, [selectedId]);
+  }, [selectedId, detailRetry]);
+
+  const handleShiftChange = useCallback((s: CashShift | null) => {
+    setCurrentShift(s?.status === "OPEN" ? s : null);
+  }, []);
 
   const selectedOrder = useMemo(() => orders.find((o) => o.id === selectedId) ?? null, [orders, selectedId]);
   const pendingTotal = orders.reduce((a, o) => a + (o.total_amount ?? 0), 0);
@@ -199,12 +206,21 @@ export default function PayScreen({ theme, onToggleTheme }: Props) {
             error={error}
             onRetry={() => setRefreshToken((t) => t + 1)}
           />
-          <OrderSettlementPanel
-            order={selectedOrder}
-            items={detailItems}
-            itemsLoading={itemsLoading}
-            onSettled={handleSettled}
-          />
+          <div className="flex min-h-0 flex-col gap-2">
+            {detailError && (
+              <div role="alert" className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/15 px-3 py-2 text-xs text-destructive">
+                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+                <span className="flex-1">{detailError}</span>
+                <button type="button" className="font-medium underline" onClick={() => setDetailRetry((n) => n + 1)}>Reintentar</button>
+              </div>
+            )}
+            <OrderSettlementPanel
+              order={selectedOrder}
+              items={detailItems}
+              itemsLoading={itemsLoading}
+              onSettled={handleSettled}
+            />
+          </div>
         </div>
       </main>
 
@@ -219,7 +235,7 @@ export default function PayScreen({ theme, onToggleTheme }: Props) {
       <ShiftDrawerDialog
         open={shiftOpen}
         onClose={() => setShiftOpen(false)}
-        onShiftChange={(s) => setCurrentShift(s?.status === "OPEN" ? s : null)}
+        onShiftChange={handleShiftChange}
       />
     </div>
   );
