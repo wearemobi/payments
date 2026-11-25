@@ -1,7 +1,7 @@
 {
   "name": "@payments/pay",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.1.6",
   "description": "M.O.B.I.™ Payments & Cashier — terminal satélite de pagos y caja (SPEC-WPAY1)",
   "author": "M.O.B.I.™",
   "type": "module",
